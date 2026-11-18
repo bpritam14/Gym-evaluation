@@ -85,6 +85,8 @@ def execute(config: dict) -> dict:
     result = {
         "task_id": config["task_id"],
         "harness_version": HARNESS_VERSION,
+        "browser_backend": config.get("browser_backend", "playwright"),
+        "harness_flavor": "mixed" if config.get("browser_backend") == "browser_use" else "opencode",
         "status": "error",
         "agent_output": "",
         "trajectory": [],
@@ -147,6 +149,7 @@ def execute(config: dict) -> dict:
             json.dumps(
                 {
                     "source_revision": revision.stdout.strip() or None,
+                    "browser_backend": config.get("browser_backend", "playwright"),
                     "harness_version": HARNESS_VERSION,
                     "runtime_sha256": {
                         str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -264,6 +267,7 @@ def execute(config: dict) -> dict:
                     input_files=browser["input_files"],
                     mcp_timeout_ms=config.get("mcp_timeout_ms", 180000),
                     refresh_socket=refresh_socket,
+                    browser_backend=config.get("browser_backend", "playwright"),
                 )
                 (workspace / "opencode.json").write_text(json.dumps(oc_config, indent=2))
                 instruction = (
@@ -289,6 +293,13 @@ def execute(config: dict) -> dict:
                     + "; todo.md is prefilled there. Native todo tools are also available. "
                     "Report completion in your final response.\n\n" + prompt
                 )
+                if config.get("browser_backend") == "browser_use":
+                    from saas_bench.opencode.prompts import BROWSER_USE_SYSTEM_PROMPT
+
+                    instruction = (
+                        BROWSER_USE_SYSTEM_PROMPT + "\nWorking files: " + str(files)
+                        + "; todo.md is prefilled there.\n\n" + prompt
+                    )
                 if browser["input_files"]:
                     instruction += "\nDeclared input files:\n" + "\n".join(
                         "- " + path for path in browser["input_files"]
@@ -308,6 +319,7 @@ def execute(config: dict) -> dict:
                             "run",
                             "--format",
                             "json",
+                            *(["--thinking"] if config.get("browser_backend") == "browser_use" else []),
                             "--model",
                             f"nemo/{config['model']}",
                             instruction,

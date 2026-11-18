@@ -51,6 +51,7 @@ saas_bench_agent:
         prepare_script: benchmarks/saas_bench/prepare.py
         num_repeats: 1
       harness: opencode
+      browser_backend: ${oc.select:saas_bench_browser_backend,playwright}
       cache_root: ${oc.env:SAAS_BENCH_CACHE_ROOT}
       worker_python: ${oc.env:SAAS_BENCH_WORKER_PYTHON,null}
       source_root: ${oc.select:saas_bench_bundle_root,responses_api_agents/saas_bench_agent/data/runtime}

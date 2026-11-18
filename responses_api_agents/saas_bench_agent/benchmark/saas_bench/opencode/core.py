@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from saas_bench.loader import load_tasks
-from saas_bench.opencode.prompts import SAAS_SYSTEM_PROMPT
+from saas_bench.opencode.prompts import BROWSER_USE_SYSTEM_PROMPT, SAAS_SYSTEM_PROMPT
 
 
 HARNESS_VERSION = "2.1.1"
@@ -105,8 +105,11 @@ def opencode_config(
     input_files: list[str] | None = None,
     mcp_timeout_ms: int = 180000,
     refresh_socket: Path | None = None,
+    browser_backend: str = "playwright",
 ) -> dict:
     """Enable browser MCP and scoped native file/todo tools; route inference through Gym."""
+    if browser_backend not in {"playwright", "browser_use"}:
+        raise ValueError("Unknown browser backend")
     parsed = urlsplit(endpoint)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("Model endpoint must be HTTP(S), without embedded credentials")
@@ -153,7 +156,7 @@ def opencode_config(
             }
         },
         "agent": {
-            "build": {"steps": max_steps, "prompt": SAAS_SYSTEM_PROMPT},
+            "build": {"steps": max_steps, "prompt": BROWSER_USE_SYSTEM_PROMPT if browser_backend == "browser_use" else SAAS_SYSTEM_PROMPT},
             "general": {"disable": True},
             "explore": {"disable": True},
         },
@@ -173,7 +176,7 @@ def opencode_config(
                 "command": [
                     python,
                     "-m",
-                    "saas_bench.opencode.browser",
+                    "saas_bench.opencode.browser_use" if browser_backend == "browser_use" else "saas_bench.opencode.browser",
                     str(browser_config),
                 ],
                 "timeout": mcp_timeout_ms,
@@ -214,6 +217,10 @@ def agent_environment(
         path = workspace / suffix
         path.mkdir(parents=True, exist_ok=True)
         env[name] = str(path)
+    env["BROWSER_USE_CONFIG_DIR"] = str(workspace / "config" / "browser-use")
+    env["ANONYMIZED_TELEMETRY"] = "false"
+    env["BROWSER_USE_CLOUD_SYNC"] = "false"
+    env["BROWSER_USE_VERSION_CHECK"] = "false"
     env["PYTHONPATH"] = str(source_root)
     env["OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX"] = str(output_tokens)
     env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true"

@@ -80,6 +80,7 @@ class SaasBenchConfig(BaseResponsesAPIAgentConfig):
     outcome_policy: StageOutcomePolicyConfig = Field(default_factory=default_outcome_policy)
     source_root: str = str(DEFAULT_BUNDLE_ROOT)
     harness: Literal["opencode", "browser_use"] = "opencode"
+    browser_backend: Literal["playwright", "browser_use"] = "playwright"
     cache_root: str
     tasks_dir: str = "tasks"
     task_selector: str = "all"
@@ -106,6 +107,8 @@ class SaasBenchConfig(BaseResponsesAPIAgentConfig):
     @model_validator(mode="after")
     def validate_native_scoring_policy(self):
         """SaaS model endings retain native credit; unavailable grading cannot be scored."""
+        if self.harness != "opencode" and self.browser_backend != "playwright":
+            raise ValueError("browser_backend is an OpenCode-only option")
         for kind in set(_MODEL_ENDINGS.values()):
             decision = choose_stage_outcome(
                 failure_kind=kind, http_status=None, stage="agent", config=self.outcome_policy

@@ -405,3 +405,15 @@ def test_run_http_reuses_persisted_grade_and_aggregates_without_agent_session(ag
         ).status_code
         == 409
     )
+
+
+def test_mixed_browser_backend_is_explicit_and_serialized(agent):
+    assert agent.config.browser_backend == "playwright"
+    values = agent.config.model_dump()
+    mixed = SaasBenchConfig.model_validate({**values, "browser_backend": "browser_use"})
+    assert mixed.harness == "opencode"
+    assert mixed.model_dump()["browser_backend"] == "browser_use"
+    with pytest.raises(ValueError, match="OpenCode-only"):
+        SaasBenchConfig.model_validate({**values, "harness": "browser_use", "browser_backend": "browser_use"})
+    with pytest.raises(ValueError):
+        SaasBenchConfig.model_validate({**values, "browser_backend": "unsupported"})

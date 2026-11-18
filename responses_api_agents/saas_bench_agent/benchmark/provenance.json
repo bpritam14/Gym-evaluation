@@ -157,7 +157,7 @@
     },
     {
       "source_path": "saas_bench/opencode/core.py",
-      "vendored_sha256": "fa85776d7d2bc26bbbb197406bcd2f8970282a3dd39c24d1102fbc41e20f31e2",
+      "vendored_sha256": "01fb196ce433eb82f8bfe14747395086b2a55e624599756dcb797f21816615a3",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
@@ -169,7 +169,7 @@
     },
     {
       "source_path": "saas_bench/opencode/prompts.py",
-      "vendored_sha256": "9c82c17c67c0b525d6580a10429c3616ead666ef6ddcb194eed98ee4a04d5852",
+      "vendored_sha256": "232f30cbfcbeb9e085760c94afe91d40d270cfa0aa20eedee43332ec5b1f53bd",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
@@ -199,7 +199,7 @@
     },
     {
       "source_path": "saas_bench/opencode/worker.py",
-      "vendored_sha256": "9d92f8b21e82a289b0b9729aaca90e7eb2dcdf3c704e7505cc788d656b37ee40",
+      "vendored_sha256": "c42a9747ee54174ad3a5178778726ba510e21cf19e3f92bb5988f815dd095e86",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
@@ -413,6 +413,12 @@
       "vendored_sha256": "2e3c311ea2b2a389d696697e4a5b2149e9a66e79fcbc53438b0fbcfc8615f19a",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
+    },
+    {
+      "source_path": "saas_bench/opencode/browser_use.py",
+      "vendored_sha256": "d2e04337d9651cf2950ff828be4037cc5b7ce9ca9d2e036e0fa18c89e8d32023",
+      "license": "Apache-2.0",
+      "origin": "nvidia-authored"
     }
   ],
   "external_verifiers": [
@@ -511,5 +517,12 @@
     "tasks/uni-m/Teamwork/teamwork_074/verify.py",
     "tasks/uni-m/Teamwork/teamwork_082/verify.py",
     "tasks/uni-m/Teamwork/teamwork_083/verify.py"
-  ]
+  ],
+  "mixed_harness": {
+    "source_implementation_commit": "b55973d",
+    "browser_use_version": "0.13.7",
+    "selector": "browser_backend=browser_use",
+    "default_backend_unchanged": true,
+    "benchmark_verifier_changes": false
+  }
 }
