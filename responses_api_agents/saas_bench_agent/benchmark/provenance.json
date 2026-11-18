@@ -169,13 +169,13 @@
     },
     {
       "source_path": "saas_bench/opencode/prompts.py",
-      "vendored_sha256": "232f30cbfcbeb9e085760c94afe91d40d270cfa0aa20eedee43332ec5b1f53bd",
+      "vendored_sha256": "c43ce3178ea1d7edf0ca2988269621c99a76ef7b664b92ec9e3c2f71b34c59f7",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
     {
       "source_path": "saas_bench/opencode/protocol.py",
-      "vendored_sha256": "c4b60cb2634a7659ce8ff5a3a48cd8d80dddbcc0b183b9f28351de8284c8cff8",
+      "vendored_sha256": "e17416a5a18a5289c710363d3ff056be5b7ff89e43016996cb05582f369e550a",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
@@ -523,6 +523,18 @@
     "browser_use_version": "0.13.7",
     "selector": "browser_backend=browser_use",
     "default_backend_unchanged": true,
-    "benchmark_verifier_changes": false
+    "benchmark_verifier_changes": false,
+    "planning_output": {
+      "fields": [
+        "evaluation_previous_goal",
+        "memory",
+        "next_goal",
+        "current_plan_item",
+        "plan_update"
+      ],
+      "actions": "unchanged MCP tool_calls",
+      "reasoning_mode_unchanged": true,
+      "scope": "mixed actor requests only"
+    }
   }
 }

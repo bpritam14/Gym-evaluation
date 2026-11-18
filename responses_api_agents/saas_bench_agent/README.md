@@ -295,3 +295,41 @@ eight tools with no tool errors. All 15 saved PNGs remained. An independent
 request/source/outcome checker passes; the driver's extra last-role assertion
 failed on OpenCode's final-step assistant prefill, which does not change the image
 policy. This validates request handling, not completion of the benchmark task.
+
+### Mixed harness planning fields
+
+For `browser_backend=browser_use`, action-producing assistant messages contain a
+JSON object in `content` alongside the unchanged executable MCP `tool_calls`:
+
+```json
+{
+  "evaluation_previous_goal": "The login page is visible; no prior action.",
+  "memory": "The requested document has not been created.",
+  "next_goal": "Enter the access code.",
+  "current_plan_item": 0,
+  "plan_update": ["Log in", "Create the document", "Verify the result"]
+}
+```
+
+The first three values are nonempty strings. All five keys are required;
+`current_plan_item` may be null and `plan_update` may be null when no plan is
+created or revised. Plan item indices are zero-based. No `think`, `thinking`,
+or `action` key is added to this object. Provider reasoning and its capture are
+unchanged; this contract does not enable or disable model reasoning.
+
+OpenCode retains this assistant content next to the tool call and the following
+tool result in its conversation history. Its existing compaction policy still
+applies; this is not browser-use's serialized history or a guarantee that every
+old planning object survives compaction unchanged. A final response uses the
+same object plus a `final_response` string, without tool calls.
+
+The model adapter enforces the contract only for mixed actor requests carrying
+`<mixed_planning_output>` in their system prompt and an advertised tool schema.
+Malformed planning is retained and rejected before returning any action, using
+the existing three-attempt protocol budget. Output-cap endings retain their
+native classification. Title generation, compaction, standard OpenCode and the
+default browser-use harness do not acquire this planning requirement.
+
+This intentionally retains MCP actions instead of adopting Run E's `action[]`
+output envelope. Use a fresh runtime bundle to opt into the updated mixed prompt
+and adapter together; existing frozen campaigns are unchanged.

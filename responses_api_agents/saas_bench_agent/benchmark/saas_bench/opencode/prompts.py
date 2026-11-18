@@ -70,4 +70,24 @@ Use inspect_input for declared images/PDFs and scoped native file/todo tools for
 working files. Track created IDs and progress so they survive compaction. Finish
 all requested subtasks and report completion in the final response. Preserve
 exact task values and do not invent existing artifacts or extra subtasks.
+
+<mixed_planning_output>
+Every action-producing response must include a JSON object in assistant content,
+alongside the normal executable MCP tool_calls. Use these five fields:
+{"evaluation_previous_goal":"What the previous action achieved or left uncertain.",
+"memory":"Concise task facts, progress, created artifacts and remaining work.",
+"next_goal":"The immediate objective of the accompanying tool call.",
+"current_plan_item":null,"plan_update":null}
+The first three fields are nonempty strings. Use 'Initial observation' for the
+first evaluation_previous_goal. current_plan_item is a zero-based
+integer when working on a plan, otherwise null. plan_update is the complete
+revised list of short plan-item strings when creating or revising a plan,
+otherwise null. Carry these facts and the latest plan forward in your history;
+update them using observed outcomes, never assumed action success.
+Keep all five fields present even when the last two are null. Do not add think,
+thinking, or action fields to this JSON. Do not wrap it in Markdown or add prose
+outside it. Actions remain normal MCP tool_calls, not text inside this object.
+Use the same planning object for the final response, with an additional
+final_response string reporting the result, and no tool calls.
+</mixed_planning_output>
 """

@@ -4,15 +4,57 @@
 
 from __future__ import annotations
 
+import json
 import re
+
+
+MIXED_PLANNING_MARKER = "<mixed_planning_output>"
+_PLANNING_FIELDS = {"evaluation_previous_goal", "memory", "next_goal", "current_plan_item", "plan_update"}
 
 
 class ModelProtocolError(ValueError):
     """The model intended an action but did not return an executable tool call."""
 
 
+def requires_mixed_planning(messages: list[dict], *, tools_available: bool) -> bool:
+    """Recognize mixed actor turns without changing title or compaction requests."""
+    return tools_available and any(
+        message.get("role") == "system"
+        and isinstance(message.get("content"), str)
+        and MIXED_PLANNING_MARKER in message["content"]
+        for message in messages
+    )
+
+
+def planning_fields(content: str, *, final: bool) -> dict:
+    """Validate visible mixed planning without manufacturing missing fields."""
+    try:
+        fields = json.loads(content)
+    except (ValueError, TypeError) as exc:
+        raise ModelProtocolError("Mixed planning content must be one JSON object, alongside MCP tool_calls") from exc
+    if not isinstance(fields, dict) or not _PLANNING_FIELDS.issubset(fields):
+        raise ModelProtocolError("Mixed planning content must contain all five planning fields")
+    allowed = _PLANNING_FIELDS | ({"final_response"} if final else set())
+    if set(fields) - allowed:
+        raise ModelProtocolError("Mixed planning content contains unsupported fields; actions belong in tool_calls")
+    for name in ("evaluation_previous_goal", "memory", "next_goal"):
+        if not isinstance(fields[name], str) or not fields[name].strip():
+            raise ModelProtocolError(f"Mixed planning field {name} must be a nonempty string")
+    item = fields["current_plan_item"]
+    if item is not None and (type(item) is not int or item < 0):
+        raise ModelProtocolError("Mixed current_plan_item must be null or a nonnegative integer")
+    plan = fields["plan_update"]
+    if plan is not None and (
+        not isinstance(plan, list) or any(not isinstance(value, str) or not value.strip() for value in plan)
+    ):
+        raise ModelProtocolError("Mixed plan_update must be null or a list of nonempty plan-item strings")
+    if final and (not isinstance(fields.get("final_response"), str) or not fields["final_response"].strip()):
+        raise ModelProtocolError("Mixed final response requires a nonempty final_response string")
+    return fields
+
+
 def native_message(
-    message: dict, *, tools_available: bool, finish_reason: str | None = None
+    message: dict, *, tools_available: bool, finish_reason: str | None = None, planning_required: bool = False
 ) -> dict:
     """Undo Gym's reasoning wrapper without executing tool-like reasoning text."""
     result = dict(message)
@@ -23,6 +65,8 @@ def native_message(
         )
     content = result.get("content") or ""
     if not isinstance(content, str):
+        if planning_required and finish_reason != "length":
+            raise ModelProtocolError("Mixed planning content must be a JSON text object")
         return result
     match = re.match(r"^<think>\n?(.*?)</think>(.*)$", content, re.DOTALL)
     if match:
@@ -30,6 +74,8 @@ def native_message(
         result["reasoning_content"] = reasoning
         result["reasoning"] = reasoning
         result["content"] = content or None
+    if planning_required and finish_reason != "length":
+        planning_fields(content, final=not bool(result.get("tool_calls")))
     if tools_available and not result.get("tool_calls"):
         if finish_reason == "length":
             # Preserve the provider's output limit for native OpenCode. An
@@ -78,11 +124,7 @@ def execution_health(events: list[dict], *, timed_out: bool = False) -> dict:
     tools = [e.get("part", {}) for e in events if e.get("type") == "tool_use"]
     failed = [t for t in tools if t.get("state", {}).get("status") == "error"]
     final = next(
-        (
-            e.get("part", {}).get("text", "")
-            for e in reversed(events)
-            if e.get("type") == "text"
-        ),
+        (e.get("part", {}).get("text", "") for e in reversed(events) if e.get("type") == "text"),
         "",
     )
     protocol_errors = any(

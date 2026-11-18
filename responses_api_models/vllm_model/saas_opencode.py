@@ -70,12 +70,15 @@ class SaasOpenCodeModel(VLLMModel):
         request: Request,
         body: NeMoGymChatCompletionCreateParamsNonStreaming = Body(),  # noqa: B008 -- FastAPI dependency
     ) -> NeMoGymChatCompletion:
-        from saas_bench.opencode.protocol import ModelProtocolError, native_message
+        from saas_bench.opencode.protocol import ModelProtocolError, native_message, requires_mixed_planning
 
         identity = current_rollout_id() or (
             request.scope.get("session", {}).get("session_id", "unknown") if request is not None else "test"
         )
         key = identity + ":" + hashlib.sha256(body.model_dump_json(exclude_unset=True).encode()).hexdigest()
+        planning_required = requires_mixed_planning(
+            body.model_dump(exclude_unset=True)["messages"], tools_available=bool(body.tools)
+        )
         if self._protocol_failures.get(key, 0) >= 3:
             raise HTTPException(
                 422,
@@ -90,6 +93,7 @@ class SaasOpenCodeModel(VLLMModel):
                         choice["message"],
                         tools_available=bool(body.tools),
                         finish_reason=choice.get("finish_reason"),
+                        planning_required=planning_required,
                     )
             except ModelProtocolError as exc:
                 count = self._protocol_failures.get(key, 0) + 1
