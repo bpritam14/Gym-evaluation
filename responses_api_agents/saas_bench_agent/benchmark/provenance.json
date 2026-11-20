@@ -169,13 +169,13 @@
     },
     {
       "source_path": "saas_bench/opencode/prompts.py",
-      "vendored_sha256": "c43ce3178ea1d7edf0ca2988269621c99a76ef7b664b92ec9e3c2f71b34c59f7",
+      "vendored_sha256": "6d1e96695df20cb4b3a321dba721dec6153f279b291c60638ee3ed73aa51442b",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },
     {
       "source_path": "saas_bench/opencode/protocol.py",
-      "vendored_sha256": "e17416a5a18a5289c710363d3ff056be5b7ff89e43016996cb05582f369e550a",
+      "vendored_sha256": "76aa5aa68b5995656630c35c24b0d7ba16c69676cc96ffdf03af2359c98c1e84",
       "license": "Apache-2.0",
       "origin": "nvidia-authored"
     },

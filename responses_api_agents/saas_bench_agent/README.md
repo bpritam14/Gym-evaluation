@@ -325,6 +325,13 @@ same object plus a `final_response` string, without tool calls.
 
 The model adapter enforces the contract only for mixed actor requests carrying
 `<mixed_planning_output>` in their system prompt and an advertised tool schema.
+The prompt requires a bare planning JSON object in content and actual native
+`tool_calls` alongside it on action turns. Bounded whole-content wrappers
+(JSON-string encoding, paired quotes, inline backticks or a complete JSON/untagged
+Markdown fence) are removed before strict field validation. Surrounding prose,
+sibling blocks, missing fields and invalid field types remain rejected. Textual
+tool-call blocks are never converted into executable calls. Executable MCP calls
+and provider reasoning are preserved verbatim.
 Malformed planning is retained and rejected before returning any action, using
 the existing three-attempt protocol budget. Output-cap endings retain their
 native classification. Title generation, compaction, standard OpenCode and the
@@ -333,3 +340,6 @@ default browser-use harness do not acquire this planning requirement.
 This intentionally retains MCP actions instead of adopting Run E's `action[]`
 output envelope. Use a fresh runtime bundle to opt into the updated mixed prompt
 and adapter together; existing frozen campaigns are unchanged.
+
+
+Mixed OpenCode + indexed browser-use MCP deployments: see [MIXED_HARNESS.md](MIXED_HARNESS.md).

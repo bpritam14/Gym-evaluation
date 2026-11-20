@@ -72,22 +72,41 @@ all requested subtasks and report completion in the final response. Preserve
 exact task values and do not invent existing artifacts or extra subtasks.
 
 <mixed_planning_output>
-Every action-producing response must include a JSON object in assistant content,
-alongside the normal executable MCP tool_calls. Use these five fields:
-{"evaluation_previous_goal":"What the previous action achieved or left uncertain.",
-"memory":"Concise task facts, progress, created artifacts and remaining work.",
-"next_goal":"The immediate objective of the accompanying tool call.",
+STRICT OUTPUT CONTRACT: keep reasoning, planning text and tool invocation in
+separate channels of ONE assistant message.
+
+1. Reasoning belongs only in the provider's separate reasoning channel.
+2. Assistant content MUST be exactly ONE bare JSON OBJECT with these five keys:
+{"evaluation_previous_goal":"What the previous action actually achieved or left uncertain.",
+"memory":"Concise observed task facts, progress, created identities and remaining work.",
+"next_goal":"The immediate objective of the accompanying native tool call.",
 "current_plan_item":null,"plan_update":null}
-The first three fields are nonempty strings. Use 'Initial observation' for the
-first evaluation_previous_goal. current_plan_item is a zero-based
-integer when working on a plan, otherwise null. plan_update is the complete
-revised list of short plan-item strings when creating or revising a plan,
-otherwise null. Carry these facts and the latest plan forward in your history;
-update them using observed outcomes, never assumed action success.
-Keep all five fields present even when the last two are null. Do not add think,
-thinking, or action fields to this JSON. Do not wrap it in Markdown or add prose
-outside it. Actions remain normal MCP tool_calls, not text inside this object.
-Use the same planning object for the final response, with an additional
-final_response string reporting the result, and no tool calls.
+3. On an action turn, ALSO emit the executable call through the API's NATIVE
+function-calling/tool_calls channel, using one of the supplied tool schemas.
+The planning JSON does not execute an action. A planning-only action turn is
+invalid. Do not substitute a textual description or an example for invocation;
+the harness controls whether a returned native tool call is executed.
+
+The first three planning fields are nonempty strings. Use 'Initial observation'
+for the first evaluation_previous_goal. current_plan_item is a zero-based
+nonnegative integer or null, never a boolean. plan_update is the complete list
+of nonempty plan-item strings when creating/revising a plan, otherwise null.
+Carry observed facts and the latest plan forward; never assume an action worked.
+Keep all five keys even when values are null.
+
+Never put the planning object inside a JSON string or outer quotes. Never add
+Markdown fences, inline backticks, explanations, XML tool tags, or a second JSON
+object to assistant content. Never print a tool/function call in a Markdown
+code block: that is TEXT, not execution. Do not include action, tool_calls,
+function, role, content, think or thinking keys inside the planning object.
+Tool names and arguments belong ONLY in native tool_calls, not assistant text
+or reasoning. Use the latest observation_id and actual DOM index as tool args.
+
+Before sending an action turn, check BOTH requirements: bare five-field planning
+JSON in content AND a real native function call alongside it. Do not return a
+final answer while an action or requested subtask remains unfinished.
+For the final response ONLY, include those same five planning keys plus one
+nonempty final_response string reporting actual outcomes, and emit NO tool calls.
+No additional fields, prose or wrapping are allowed in either case.
 </mixed_planning_output>
 """

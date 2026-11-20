@@ -334,6 +334,156 @@ def test_invalid_mixed_planning_is_not_an_executable_model_message(change):
         )
 
 
+@pytest.mark.parametrize("fence", ["json", "JSON", ""])
+@pytest.mark.parametrize("final", [False, True])
+def test_mixed_accepts_one_json_fence_preserving_native_calls(fence, final):
+    from saas_bench.opencode.protocol import native_message, planning_fields
+
+    fields = mixed_plan() | ({"final_response": "Saved and verified."} if final else {})
+    content = json.dumps(fields)
+    fenced = f" \n```{fence}\r\n{content}\r\n```\n "
+    message = {"role": "assistant", "content": fenced, "reasoning_content": "Provider reasoning"}
+    if not final:
+        message["tool_calls"] = [
+            {
+                "id": "call-1",
+                "type": "function",
+                "function": {"name": "saas_browser_click", "arguments": '{"index":4,"observation_id":"00004"}'},
+            }
+        ]
+    actual = native_message(
+        message, tools_available=True, planning_required=True, finish_reason="stop" if final else "tool_calls"
+    )
+    assert actual == message | {"content": content}
+    assert message["content"] == fenced
+    assert planning_fields(fenced, final=final) == fields
+    # Standard OpenCode and output-cap endings retain their original content.
+    assert native_message(message, tools_available=True) == message
+    assert native_message(message, tools_available=True, planning_required=True, finish_reason="length") == message
+
+
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        "Explanation\n```json\n%s\n```",
+        "```json\n%s\n```\nMore prose",
+        "```json\n%s\n```\n```json\n{}\n```",
+        "```python\n%s\n```",
+        "```json\n%s",
+    ],
+)
+def test_mixed_does_not_extract_planning_from_prose_or_multiple_blocks(wrapper):
+    from saas_bench.opencode.protocol import ModelProtocolError, planning_fields
+
+    with pytest.raises(ModelProtocolError):
+        planning_fields(wrapper % json.dumps(mixed_plan()), final=False)
+
+
+@pytest.mark.parametrize("change", [{"memory": ""}, {"current_plan_item": True}, {"action": []}, {"think": "extra"}])
+def test_fenced_mixed_planning_still_requires_valid_fields(change):
+    from saas_bench.opencode.protocol import ModelProtocolError, planning_fields
+
+    with pytest.raises(ModelProtocolError):
+        planning_fields("```json\n" + json.dumps(mixed_plan() | change) + "\n```", final=False)
+
+
+@pytest.mark.parametrize("final", [False, True])
+@pytest.mark.parametrize(
+    "wrapping",
+    [
+        "json_string",
+        "double_json_string",
+        "single_quotes",
+        "raw_double_quotes",
+        "quoted_fence",
+        "fence_encoded_string",
+        "inline_code",
+        "four_backticks",
+    ],
+)
+def test_mixed_outer_presentation_wrappers_preserve_channels(final, wrapping):
+    from saas_bench.opencode.protocol import native_message
+
+    fields = mixed_plan() | {"memory": 'Sam\'s "quoted" note with \\ slash and `literal` text.'}
+    if final:
+        fields["final_response"] = "Saved and verified."
+    content = json.dumps(fields)
+    fenced = "```json\n" + content + "\n```"
+    variants = {
+        "json_string": json.dumps(content),
+        "double_json_string": json.dumps(json.dumps(content)),
+        "single_quotes": "'" + content + "'",
+        "raw_double_quotes": '"' + content + '"',
+        "quoted_fence": '"' + fenced + '"',
+        "fence_encoded_string": "```json\n" + json.dumps(content) + "\n```",
+        "inline_code": "`" + content + "`",
+        "four_backticks": "````json\n" + fenced + "\n````",
+    }
+    calls = (
+        []
+        if final
+        else [
+            {
+                "id": "call-exact",
+                "type": "function",
+                "function": {"name": "saas_browser_click", "arguments": '{"index":9,"observation_id":"00001"}'},
+            }
+        ]
+    )
+    message = {
+        "role": "assistant",
+        "content": variants[wrapping],
+        "reasoning_content": "Original reasoning",
+        "tool_calls": calls,
+    }
+    before = json.loads(json.dumps(message))
+    actual = native_message(
+        message, tools_available=True, planning_required=True, finish_reason="stop" if final else "tool_calls"
+    )
+    assert json.loads(actual["content"]) == fields
+    assert actual["reasoning_content"] == before["reasoning_content"]
+    assert actual["tool_calls"] == before["tool_calls"]
+    assert message == before
+    assert native_message(message, tools_available=True) == before
+    assert native_message(message, tools_available=True, planning_required=True, finish_reason="length") == before
+
+
+@pytest.mark.parametrize("quoted", [False, True])
+def test_mixed_textual_tool_markdown_is_never_promoted_to_native_calls(quoted):
+    from saas_bench.opencode.protocol import ModelProtocolError, native_message
+
+    content = (
+        "```json\n"
+        + json.dumps(mixed_plan())
+        + '\n```\n\n```tool\n{"name":"saas_browser_click","arguments":{"index":9,"observation_id":"00001"}}\n```'
+    )
+    if quoted:
+        content = json.dumps(content)
+    message = {"role": "assistant", "content": content, "tool_calls": None}
+    with pytest.raises(ModelProtocolError):
+        native_message(message, tools_available=True, planning_required=True, finish_reason="stop")
+    assert message["tool_calls"] is None
+
+
+def test_mixed_wrapper_depth_is_bounded():
+    from saas_bench.opencode.protocol import ModelProtocolError, planning_fields
+
+    content = json.dumps(mixed_plan())
+    for _ in range(6):
+        content = json.dumps(content)
+    with pytest.raises(ModelProtocolError):
+        planning_fields(content, final=False)
+
+
+def test_mixed_prompt_requires_real_native_tool_channel():
+    from saas_bench.opencode.prompts import BROWSER_USE_SYSTEM_PROMPT
+
+    assert "API's NATIVE" in BROWSER_USE_SYSTEM_PROMPT
+    assert "Never print a tool/function call in a Markdown" in BROWSER_USE_SYSTEM_PROMPT
+    assert "planning-only action turn is" in BROWSER_USE_SYSTEM_PROMPT
+    assert "separate reasoning channel" in BROWSER_USE_SYSTEM_PROMPT
+
+
 def test_mixed_final_report_and_output_cap_preserve_native_endings():
     from saas_bench.opencode.protocol import ModelProtocolError, native_message
 

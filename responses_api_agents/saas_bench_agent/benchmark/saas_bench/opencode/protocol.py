@@ -26,10 +26,42 @@ def requires_mixed_planning(messages: list[dict], *, tools_available: bool) -> b
     )
 
 
+def _unfence_planning(content: str) -> str:
+    """Remove bounded whole-content presentation wrappers, never extract actions.
+
+    Accept JSON-string encoding, paired cosmetic quotes, inline backticks and
+    complete JSON/untagged Markdown fences. The entire resulting text must still
+    validate as the planning object. Prose, sibling blocks and textual tool calls
+    are never promoted to executable content or native tool_calls.
+    """
+    value = content.strip()
+    for _ in range(4):
+        match = re.fullmatch(r"(`{3,})(?:json)?[ \t]*\r?\n(.*?)\r?\n\1", value, re.DOTALL | re.IGNORECASE)
+        if match:
+            value = match.group(2).strip()
+            continue
+        if value.startswith('"'):
+            try:
+                decoded = json.loads(value)
+            except (ValueError, TypeError):
+                pass
+            else:
+                if isinstance(decoded, str):
+                    value = decoded.strip()
+                    continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"', "`"):
+            inner = value[1:-1].strip()
+            if inner.startswith(("{", "```")):
+                value = inner
+                continue
+        break
+    return value
+
+
 def planning_fields(content: str, *, final: bool) -> dict:
     """Validate visible mixed planning without manufacturing missing fields."""
     try:
-        fields = json.loads(content)
+        fields = json.loads(_unfence_planning(content) if isinstance(content, str) else content)
     except (ValueError, TypeError) as exc:
         raise ModelProtocolError("Mixed planning content must be one JSON object, alongside MCP tool_calls") from exc
     if not isinstance(fields, dict) or not _PLANNING_FIELDS.issubset(fields):
@@ -75,7 +107,9 @@ def native_message(
         result["reasoning"] = reasoning
         result["content"] = content or None
     if planning_required and finish_reason != "length":
+        content = _unfence_planning(content)
         planning_fields(content, final=not bool(result.get("tool_calls")))
+        result["content"] = content
     if tools_available and not result.get("tool_calls"):
         if finish_reason == "length":
             # Preserve the provider's output limit for native OpenCode. An
